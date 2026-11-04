@@ -81,11 +81,15 @@ export function KageApp() {
             <Stat label="Rewards" value={formatKage(rewards)} />
             <button
               type="button"
-              onClick={() => setView("wallet")}
+              onClick={() => {
+                setView("wallet");
+                if (address) return;
+                useWallet.getState().openPicker();
+              }}
               className={
                 address
                   ? "inline-flex min-h-11 items-center gap-2 rounded-full bg-brass px-4 text-sm font-semibold text-brass-ink"
-                  : "inline-flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm text-paper"
+                  : "inline-flex min-h-11 items-center gap-2 rounded-full bg-brass px-4 text-sm font-semibold text-brass-ink"
               }
             >
               <Wallet className="size-4" />
@@ -138,6 +142,7 @@ export function KageApp() {
         {view === "wallet" && <WalletDesk />}
         {view === "contracts" && <Contracts />}
       </div>
+      <WalletPicker />
     </div>
   );
 }
@@ -670,7 +675,6 @@ function Token() {
 }
 
 function WalletDesk() {
-  const extensions = useWallet((s) => s.extensions);
   const extensionName = useWallet((s) => s.extensionName);
   const address = useWallet((s) => s.address);
   const chainId = useWallet((s) => s.chainId);
@@ -679,7 +683,6 @@ function WalletDesk() {
   const sending = useWallet((s) => s.sending);
   const error = useWallet((s) => s.error);
   const txHash = useWallet((s) => s.txHash);
-  const connect = useWallet((s) => s.connect);
   const disconnect = useWallet((s) => s.disconnect);
   const switchNetwork = useWallet((s) => s.switchNetwork);
   const send = useWallet((s) => s.send);
@@ -690,10 +693,10 @@ function WalletDesk() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Panel>
-        <p className="text-sm text-brass">Browser extension</p>
+        <p className="text-sm text-brass">Any wallet</p>
         <h2 className="mt-1 font-display text-4xl text-paper italic">Connect the wallet that will own Kage.</h2>
         <p className="mt-2 text-mute">
-          MetaMask, Rabby, and any other injected wallet. This does not touch the preview ledger.
+          MetaMask, Rabby, Brave, Coinbase, OKX, or a phone wallet. This does not touch the preview ledger.
         </p>
         {address ? (
           <div className="mt-5 flex flex-col gap-3">
@@ -747,50 +750,17 @@ function WalletDesk() {
           </div>
         ) : (
           <div className="mt-5 flex flex-col gap-3">
-            {extensions.length === 0 ? (
-              <p className="rounded-2xl border border-line bg-ink p-4 text-sm text-mute">
-                No wallet extension answered. Install MetaMask or Rabby, open this desk in that browser, then connect.
-              </p>
-            ) : (
-              extensions.map((ext) => (
-                <button
-                  key={ext.uuid}
-                  type="button"
-                  disabled={connecting}
-                  onClick={() => {
-                    void connect(ext.uuid).then(() => {
-                      const next = useWallet.getState();
-                      if (next.address) toast.success(`${ext.name} connected.`);
-                      else if (next.error) toast.error(next.error);
-                    });
-                  }}
-                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-ink px-4 text-left disabled:opacity-50"
-                >
-                  {ext.icon ? (
-                    <img src={ext.icon} alt="" className="size-8 rounded-lg" />
-                  ) : (
-                    <Wallet className="size-5 text-brass" />
-                  )}
-                  <span>
-                    <span className="block font-semibold text-paper">{ext.name}</span>
-                    <span className="text-sm text-mute">{connecting ? "Waiting for approval" : "Connect"}</span>
-                  </span>
-                </button>
-              ))
-            )}
-            {extensions.length === 0 ? (
-              <Primary
-                disabled={connecting}
-                onClick={() => {
-                  void connect().then(() => {
-                    const next = useWallet.getState();
-                    if (next.error) toast.error(next.error);
-                  });
-                }}
-              >
-                {connecting ? "Waiting" : "Connect wallet"}
-              </Primary>
-            ) : null}
+            <Primary
+              disabled={connecting}
+              onClick={() => {
+                useWallet.getState().openPicker();
+              }}
+            >
+              {connecting ? "Waiting for the wallet" : "Connect wallet"}
+            </Primary>
+            <p className="text-sm text-mute">
+              Opens every wallet in this browser. Phone wallets, Tangem, and anything else use the other-wallet code.
+            </p>
           </div>
         )}
         {error ? <p className="mt-3 text-sm text-clay">{error}</p> : null}
@@ -848,6 +818,95 @@ function WalletDesk() {
           </a>
         ) : null}
       </Panel>
+    </div>
+  );
+}
+
+function WalletPicker() {
+  const open = useWallet((s) => s.pickerOpen);
+  const extensions = useWallet((s) => s.extensions);
+  const connecting = useWallet((s) => s.connecting);
+  const error = useWallet((s) => s.error);
+  const wcUri = useWallet((s) => s.wcUri);
+  const wcQr = useWallet((s) => s.wcQr);
+  const closePicker = useWallet((s) => s.closePicker);
+  const connect = useWallet((s) => s.connect);
+  const connectOther = useWallet((s) => s.connectOther);
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/80 p-4 sm:items-center" role="dialog" aria-modal="true">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-card border border-line bg-panel p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-brass">Choose a wallet</p>
+            <h2 className="font-display text-4xl text-paper italic">Connect</h2>
+          </div>
+          <button type="button" onClick={closePicker} className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm text-paper">
+            Close
+          </button>
+        </div>
+        <div className="mt-4 flex flex-col gap-2">
+          {extensions.map((ext) => (
+            <button
+              key={ext.uuid}
+              type="button"
+              disabled={connecting}
+              onClick={() => {
+                void connect(ext.uuid).then(() => {
+                  const next = useWallet.getState();
+                  if (next.address) toast.success(`${ext.name} connected.`);
+                  else if (next.error) toast.error(next.error);
+                });
+              }}
+              className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-ink px-4 text-left disabled:opacity-50"
+            >
+              {ext.icon ? <img src={ext.icon} alt="" className="size-8 rounded-lg" /> : <Wallet className="size-5 text-brass" />}
+              <span>
+                <span className="block font-semibold text-paper">{ext.name}</span>
+                <span className="text-sm text-mute">Browser wallet</span>
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={connecting}
+            onClick={() => {
+              void connectOther().then(() => {
+                const next = useWallet.getState();
+                if (next.address) toast.success("Wallet connected.");
+                else if (next.error) toast.error(next.error);
+              });
+            }}
+            className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-ink px-4 text-left disabled:opacity-50"
+          >
+            <Wallet className="size-5 text-brass" />
+            <span>
+              <span className="block font-semibold text-paper">Phone or other wallet</span>
+              <span className="text-sm text-mute">Tangem, Trust, Rainbow, MetaMask mobile</span>
+            </span>
+          </button>
+        </div>
+        {wcQr ? (
+          <div className="mt-4 flex flex-col items-center gap-3">
+            <img src={wcQr} alt="Scan with any wallet" className="size-56 rounded-2xl" />
+            <p className="text-center text-sm text-mute">Scan with any wallet, or copy the link into it.</p>
+            {wcUri ? (
+              <Primary
+                tone="ghost"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(wcUri);
+                  toast.success("Wallet link copied.");
+                }}
+              >
+                <Copy className="size-4" />
+                Copy link
+              </Primary>
+            ) : null}
+          </div>
+        ) : null}
+        {error ? <p className="mt-3 text-sm text-clay">{error}</p> : null}
+      </div>
     </div>
   );
 }
