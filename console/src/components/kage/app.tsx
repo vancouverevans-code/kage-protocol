@@ -16,7 +16,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { BOT_TESTNET, DEPLOY_ROLES, formatBot, isAddress, parseBot, shortAddress } from "@/lib/kage/chain";
+import { BOT_TESTNET, CONTRACTS, formatBot, isAddress, OWNER_ADDRESS, parseBot, shortAddress } from "@/lib/kage/chain";
 import {
   REVIEW_FEE,
   YOU,
@@ -912,15 +912,14 @@ function WalletPicker() {
 }
 
 function Contracts() {
-  const address = useWallet((s) => s.address);
   return (
     <div className="flex flex-col gap-4">
       <Panel>
-        <p className="text-sm text-brass">Testnet · chain {BOT_TESTNET.chainId} · not mined</p>
-        <h2 className="mt-1 font-display text-4xl text-paper italic">Your wallet owns it. Nothing is deployed.</h2>
+        <p className="text-sm text-brass">Testnet · chain {BOT_TESTNET.chainId} · mined</p>
+        <h2 className="mt-1 font-display text-4xl text-paper italic">KAGE is live. You own it.</h2>
         <p className="mt-2 max-w-2xl text-mute">
-          Connect the owner wallet, then fund the gas payer with 1 test BOT. The gas address never receives owner,
-          admin, or signer. Mint and pricing stay transactions only you can send.
+          Owner, admin, and signer are {shortAddress(OWNER_ADDRESS)}. The gas key cannot mint or upgrade. From your
+          wallet, mint the genesis KAGE and allow the pricing contract on the market.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <a
@@ -943,26 +942,31 @@ function Contracts() {
       </Panel>
       <div className="grid gap-3 md:grid-cols-2">
         <Panel>
-          <p className="text-sm text-mute">Owner address</p>
-          <p className="mt-2 break-all font-display text-2xl text-paper">{address ?? "Connect a wallet"}</p>
+          <p className="text-sm text-mute">Owner</p>
+          <p className="mt-2 break-all font-display text-2xl text-paper">{OWNER_ADDRESS}</p>
         </Panel>
-        {DEPLOY_ROLES.map((role) => (
-          <Panel key={role.name} className="flex items-center justify-between gap-3">
+        {CONTRACTS.map((item) => (
+          <Panel key={item.address} className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-semibold">{role.name}</p>
-              <p className="truncate text-sm text-mute">{role.detail}</p>
-            </div>
-            {role.detail.startsWith("0x") ? (
-              <Primary
-                tone="ghost"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(role.detail);
-                  toast.success("Address copied.");
-                }}
+              <p className="font-semibold">{item.name}</p>
+              <a
+                className="block truncate text-sm text-brass underline"
+                href={`${BOT_TESTNET.explorer}/address/${item.address}`}
+                target="_blank"
+                rel="noreferrer"
               >
-                <Copy className="size-4" />
-              </Primary>
-            ) : null}
+                {item.address}
+              </a>
+            </div>
+            <Primary
+              tone="ghost"
+              onClick={() => {
+                void navigator.clipboard?.writeText(item.address);
+                toast.success(`${item.name} copied.`);
+              }}
+            >
+              <Copy className="size-4" />
+            </Primary>
           </Panel>
         ))}
       </div>

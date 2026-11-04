@@ -28,17 +28,29 @@ forge script script/DeployKageLegacy.s.sol --rpc-url "$BOTCHAIN_TESTNET_RPC" --b
 
 Use `BOTCHAIN_MAINNET_RPC` for mainnet, with a new gas key. `OWNER` is your wallet on that network too.
 
-The deployer key pays gas only. `OWNER` is your wallet: token owner, admin, expected signer, registry owner, and pause-switch owner. Nothing is mined yet.
+Testnet is deployed. Owner, admin, and expected signer are `0x0EbE98279Cfa8bF30a0B6ad5Af5829E801102b76`. The gas key is not an owner.
 
-Do not treat the addresses below as live. They were predicted for a deployer-owned run and no longer apply once `OWNER` is your address.
+| Contract | Address |
+| --- | --- |
+| KAGE token | `0x64b60e9575bC0b09F802e55a15B18a5C86aE5cf7` |
+| Vouch V2 | `0xDC139924D5f948871Ae9f8050c3b8FA43D493fA2` |
+| Market | `0x801FF0a5364E2c4E0cEF6202e6B0Da9698C09D8e` |
+| Rewards | `0x7319FD13FACd97e0c3D70Bf53BDeF91c87Bc45fC` |
+| Adaptive LMSR | `0x3D9Fe14da291F5034Cf7D2128A6e7d8E8F20980D` |
+| Registry | `0x397b3A679612F60Dc73D43a6f79b910DD60172a7` |
+| Pause switch | `0x40D2a96feFAC6074160bAa79d94aFC9D95C40a70` |
+| Lock list | `0x1fA6e418D2B0bc1d48f18dd559Ce9689a2B93A00` |
+| Profile | `0xB700Ba4BaE80365e024476d05f7349B4bAEE14D9` |
+| Review | `0x8d585141aCfD570C6c5eBF1b0393AeD891812b7E` |
+| Slash | `0x0EcDA84b455220BC7f2b995EB2Ae832BF2c0b29a` |
 
-After the broadcast confirms, you send three transactions from that wallet:
+Explorer: https://scan.bohr.life
 
-1. `mint` on the KAGE token to your address for 10,000,000 KAGE.
-2. `mint` on the KAGE token to the rewards contract for 1,000,000 KAGE.
+The owner still sends three transactions. The gas key cannot:
+
+1. `mint` 10,000,000 KAGE to the owner.
+2. `mint` 1,000,000 KAGE to the rewards contract.
 3. `setPricingAllowed` on the market for the adaptive pricing contract.
-
-The gas key cannot do those. It has no role once the second script confirms.
 
 The clickable desk source is in [console/](console/).
 
