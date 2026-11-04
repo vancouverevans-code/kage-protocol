@@ -41,11 +41,13 @@ export function Primary({
   onClick,
   tone = "brass",
   type = "button",
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   tone?: "brass" | "clay" | "ghost";
   type?: "button" | "submit";
+  disabled?: boolean;
 }) {
   const toneClass =
     tone === "brass"
@@ -57,8 +59,9 @@ export function Primary({
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
         toneClass,
       )}
     >

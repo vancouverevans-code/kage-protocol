@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
   ArrowUpRight,
@@ -12,10 +12,12 @@ import {
   MessageSquare,
   RotateCcw,
   Scale,
+  Unplug,
   Users,
+  Wallet,
 } from "lucide-react";
+import { BOT_TESTNET, DEPLOY_ROLES, formatBot, isAddress, parseBot, shortAddress } from "@/lib/kage/chain";
 import {
-  CONTRACTS,
   REVIEW_FEE,
   YOU,
   formatKage,
@@ -27,6 +29,7 @@ import {
   type View,
 } from "@/lib/kage/model";
 import { receivedBy, stakedBy, useKage } from "@/lib/kage/store";
+import { useWallet } from "@/lib/kage/wallet";
 import { Field, Panel, Primary, fieldClass } from "./ui";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
@@ -38,6 +41,7 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "rewards", label: "Rewards", icon: Gift },
   { id: "slash", label: "Slash", icon: Gavel },
   { id: "token", label: "KAGE", icon: Coins },
+  { id: "wallet", label: "Wallet", icon: Wallet },
   { id: "contracts", label: "Contracts", icon: Scale },
 ];
 
@@ -54,6 +58,10 @@ export function KageApp() {
   const vouches = useKage((s) => s.vouches);
   const reset = useKage((s) => s.reset);
   const staked = stakedBy(YOU, vouches);
+  const discover = useWallet((s) => s.discover);
+  const address = useWallet((s) => s.address);
+
+  useEffect(() => discover(), [discover]);
 
   return (
     <div className="min-h-screen bg-ink text-paper">
@@ -64,13 +72,25 @@ export function KageApp() {
             <p className="text-sm uppercase tracking-widest text-brass">BOT Chain desk</p>
             <h1 className="font-display text-5xl leading-none text-paper italic">Kage</h1>
             <p className="mt-2 max-w-xl text-mute">
-              Reputation you can stake. This ledger is live in the preview. Chain deploy waits on testnet gas.
+              The book below is a preview ledger. The wallet talks to BOT Chain. Your address is the owner. The gas key is not.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Stat label="Liquid" value={`${formatKage(balance)} KAGE`} />
             <Stat label="Staked" value={formatKage(staked)} />
             <Stat label="Rewards" value={formatKage(rewards)} />
+            <button
+              type="button"
+              onClick={() => setView("wallet")}
+              className={
+                address
+                  ? "inline-flex min-h-11 items-center gap-2 rounded-full bg-brass px-4 text-sm font-semibold text-brass-ink"
+                  : "inline-flex min-h-11 items-center gap-2 rounded-full border border-line px-4 text-sm text-paper"
+              }
+            >
+              <Wallet className="size-4" />
+              {address ? shortAddress(address) : "Connect wallet"}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -115,6 +135,7 @@ export function KageApp() {
         {view === "rewards" && <Rewards />}
         {view === "slash" && <Slash />}
         {view === "token" && <Token />}
+        {view === "wallet" && <WalletDesk />}
         {view === "contracts" && <Contracts />}
       </div>
     </div>
@@ -648,41 +669,241 @@ function Token() {
   );
 }
 
+function WalletDesk() {
+  const extensions = useWallet((s) => s.extensions);
+  const extensionName = useWallet((s) => s.extensionName);
+  const address = useWallet((s) => s.address);
+  const chainId = useWallet((s) => s.chainId);
+  const balanceWei = useWallet((s) => s.balanceWei);
+  const connecting = useWallet((s) => s.connecting);
+  const sending = useWallet((s) => s.sending);
+  const error = useWallet((s) => s.error);
+  const txHash = useWallet((s) => s.txHash);
+  const connect = useWallet((s) => s.connect);
+  const disconnect = useWallet((s) => s.disconnect);
+  const switchNetwork = useWallet((s) => s.switchNetwork);
+  const send = useWallet((s) => s.send);
+  const [to, setTo] = useState("");
+  const [amount, setAmount] = useState("0.01");
+  const onBot = chainId === BOT_TESTNET.chainId;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Panel>
+        <p className="text-sm text-brass">Browser extension</p>
+        <h2 className="mt-1 font-display text-4xl text-paper italic">Connect the wallet that will own Kage.</h2>
+        <p className="mt-2 text-mute">
+          MetaMask, Rabby, and any other injected wallet. This does not touch the preview ledger.
+        </p>
+        {address ? (
+          <div className="mt-5 flex flex-col gap-3">
+            <div className="rounded-2xl border border-line bg-ink p-4">
+              <p className="text-xs uppercase tracking-wider text-mute">{extensionName ?? "Wallet"}</p>
+              <p className="mt-1 break-all font-display text-2xl text-paper">{address}</p>
+              <p className="mt-2 text-sm text-mute">
+                {onBot ? BOT_TESTNET.name : `Wrong network · chain ${chainId ?? "unknown"}`}
+              </p>
+              <p className="mt-1 font-display text-3xl text-brass">{formatBot(balanceWei)} BOT</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Primary
+                tone="ghost"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(address);
+                  toast.success("Address copied. This is the owner address.");
+                }}
+              >
+                <Copy className="size-4" />
+                Copy owner
+              </Primary>
+              <a
+                className="inline-flex min-h-11 items-center rounded-full border border-line px-4 text-sm text-paper"
+                href={`${BOT_TESTNET.explorer}/address/${address}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Explorer
+              </a>
+              {onBot ? null : (
+                <Primary
+                  onClick={() => {
+                    void switchNetwork().then(() => toast.success("Asked the wallet for BOT Chain testnet."));
+                  }}
+                >
+                  Switch to testnet
+                </Primary>
+              )}
+              <Primary
+                tone="ghost"
+                onClick={() => {
+                  void disconnect();
+                  toast("Wallet disconnected from the desk.");
+                }}
+              >
+                <Unplug className="size-4" />
+                Disconnect
+              </Primary>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 flex flex-col gap-3">
+            {extensions.length === 0 ? (
+              <p className="rounded-2xl border border-line bg-ink p-4 text-sm text-mute">
+                No wallet extension answered. Install MetaMask or Rabby, open this desk in that browser, then connect.
+              </p>
+            ) : (
+              extensions.map((ext) => (
+                <button
+                  key={ext.uuid}
+                  type="button"
+                  disabled={connecting}
+                  onClick={() => {
+                    void connect(ext.uuid).then(() => {
+                      const next = useWallet.getState();
+                      if (next.address) toast.success(`${ext.name} connected.`);
+                      else if (next.error) toast.error(next.error);
+                    });
+                  }}
+                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-ink px-4 text-left disabled:opacity-50"
+                >
+                  {ext.icon ? (
+                    <img src={ext.icon} alt="" className="size-8 rounded-lg" />
+                  ) : (
+                    <Wallet className="size-5 text-brass" />
+                  )}
+                  <span>
+                    <span className="block font-semibold text-paper">{ext.name}</span>
+                    <span className="text-sm text-mute">{connecting ? "Waiting for approval" : "Connect"}</span>
+                  </span>
+                </button>
+              ))
+            )}
+            {extensions.length === 0 ? (
+              <Primary
+                disabled={connecting}
+                onClick={() => {
+                  void connect().then(() => {
+                    const next = useWallet.getState();
+                    if (next.error) toast.error(next.error);
+                  });
+                }}
+              >
+                {connecting ? "Waiting" : "Connect wallet"}
+              </Primary>
+            ) : null}
+          </div>
+        )}
+        {error ? <p className="mt-3 text-sm text-clay">{error}</p> : null}
+      </Panel>
+
+      <Panel>
+        <p className="text-sm text-mute">On-chain transfer</p>
+        <h2 className="mt-1 font-display text-3xl text-paper italic">Send testnet BOT.</h2>
+        <p className="mt-2 text-sm text-mute">
+          Your wallet signs this. It moves BOT on chain {BOT_TESTNET.chainId}, not the preview KAGE balance.
+        </p>
+        <form
+          className="mt-4 flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!isAddress(to)) {
+              toast.error("Enter a full 0x address.");
+              return;
+            }
+            const wei = parseBot(amount);
+            if (wei == null || wei <= 0n) {
+              toast.error("Enter a BOT amount.");
+              return;
+            }
+            void send(to.trim(), wei).then((hash) => {
+              if (hash) toast.success("Transfer submitted.");
+              else if (useWallet.getState().error) toast.error(useWallet.getState().error ?? "Send failed.");
+            });
+          }}
+        >
+          <Field label="To">
+            <input
+              className={fieldClass}
+              value={to}
+              placeholder="0x"
+              onChange={(e) => setTo(e.target.value)}
+              spellCheck={false}
+            />
+          </Field>
+          <Field label="Amount in BOT">
+            <input className={fieldClass} value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+          </Field>
+          <Primary type="submit" disabled={sending || !address}>
+            {sending ? "Waiting for the wallet" : "Send BOT"}
+          </Primary>
+        </form>
+        {txHash ? (
+          <a
+            className="mt-3 inline-flex text-sm text-brass underline"
+            href={`${BOT_TESTNET.explorer}/tx/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View transaction
+          </a>
+        ) : null}
+      </Panel>
+    </div>
+  );
+}
+
 function Contracts() {
+  const address = useWallet((s) => s.address);
   return (
     <div className="flex flex-col gap-4">
       <Panel>
-        <p className="text-sm text-brass">Testnet · chain 968 · not mined yet</p>
-        <h2 className="mt-1 font-display text-4xl text-paper italic">Predicted addresses</h2>
+        <p className="text-sm text-brass">Testnet · chain {BOT_TESTNET.chainId} · not mined</p>
+        <h2 className="mt-1 font-display text-4xl text-paper italic">Your wallet owns it. Nothing is deployed.</h2>
         <p className="mt-2 max-w-2xl text-mute">
-          These match a nonce-0 deploy from the Kage deployer. Fund that wallet on the BOT Chain faucet, then the same
-          script broadcasts them. Mainnet stays a separate key.
+          Connect the owner wallet, then fund the gas payer with 1 test BOT. The gas address never receives owner,
+          admin, or signer. Mint and pricing stay transactions only you can send.
         </p>
-        <a
-          className="mt-4 inline-flex min-h-11 items-center text-brass underline"
-          href="https://github.com/vancouverevans-code/kage-protocol"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Source on GitHub
-        </a>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            className="inline-flex min-h-11 items-center text-brass underline"
+            href="https://github.com/vancouverevans-code/kage-protocol"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Source on GitHub
+          </a>
+          <a
+            className="inline-flex min-h-11 items-center text-brass underline"
+            href="https://faucet.botchain.ai/en/basic"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Testnet faucet
+          </a>
+        </div>
       </Panel>
       <div className="grid gap-3 md:grid-cols-2">
-        {CONTRACTS.map((c) => (
-          <Panel key={c.address} className="flex items-center justify-between gap-3">
+        <Panel>
+          <p className="text-sm text-mute">Owner address</p>
+          <p className="mt-2 break-all font-display text-2xl text-paper">{address ?? "Connect a wallet"}</p>
+        </Panel>
+        {DEPLOY_ROLES.map((role) => (
+          <Panel key={role.name} className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-semibold">{c.name}</p>
-              <p className="truncate text-sm text-mute">{c.address}</p>
+              <p className="font-semibold">{role.name}</p>
+              <p className="truncate text-sm text-mute">{role.detail}</p>
             </div>
-            <Primary
-              tone="ghost"
-              onClick={() => {
-                void navigator.clipboard?.writeText(c.address);
-                toast.success(`${c.name} copied.`);
-              }}
-            >
-              <Copy className="size-4" />
-            </Primary>
+            {role.detail.startsWith("0x") ? (
+              <Primary
+                tone="ghost"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(role.detail);
+                  toast.success("Address copied.");
+                }}
+              >
+                <Copy className="size-4" />
+              </Primary>
+            ) : null}
           </Panel>
         ))}
       </div>
