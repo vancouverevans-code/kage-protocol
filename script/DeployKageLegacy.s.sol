@@ -18,9 +18,12 @@ import {InteractionControl} from "../src/utils/InteractionControl.sol";
 contract DeployKageLegacy is Script {
   function run() external {
     uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
-    address owner = vm.addr(pk);
+    address owner = vm.envAddress("OWNER");
+    if (owner == address(0)) revert("OWNER required");
     address admin = vm.envOr("ADMIN", owner);
-    address signer = vm.envAddress("EXPECTED_SIGNER");
+    if (admin == address(0)) admin = owner;
+    address signer = vm.envOr("EXPECTED_SIGNER", owner);
+    if (signer == address(0)) signer = owner;
     address verifier = vm.envAddress("SIGNATURE_VERIFIER");
     ContractAddressManager cam = ContractAddressManager(vm.envAddress("KAGE_CAM"));
     InteractionControl interactionControl = InteractionControl(vm.envAddress("KAGE_IC"));
@@ -63,6 +66,8 @@ contract DeployKageLegacy is Script {
     controlled[2] = ETHOS_VOUCH;
     controlled[3] = SLASHER;
     interactionControl.addControlledContractNames(controlled);
+    interactionControl.transferOwnership(owner);
+    cam.transferOwnership(owner);
 
     vm.stopBroadcast();
 

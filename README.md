@@ -26,18 +26,19 @@ forge script script/DeployKage.s.sol --rpc-url "$BOTCHAIN_TESTNET_RPC" --broadca
 forge script script/DeployKageLegacy.s.sol --rpc-url "$BOTCHAIN_TESTNET_RPC" --broadcast --slow
 ```
 
-Use `BOTCHAIN_MAINNET_RPC` for mainnet, with a new key. Owner and admin are the deployer. `EXPECTED_SIGNER` authorizes signed actions and should stay off the upgrade key.
+Use `BOTCHAIN_MAINNET_RPC` for mainnet, with a new gas key. `OWNER` is your wallet on that network too.
 
-Addresses written after a real broadcast go in `deployments/`. Nothing is mined yet. The deployer nonce on testnet is 0 and the predicted KAGE token has no bytecode. Do not treat the addresses below as live.
+The deployer key pays gas only. `OWNER` is your wallet: token owner, admin, expected signer, registry owner, and pause-switch owner. Nothing is mined yet.
 
-Predicted only, and only if the deployer sends no other transaction first:
+Do not treat the addresses below as live. They were predicted for a deployer-owned run and no longer apply once `OWNER` is your address.
 
-| Contract | Predicted address |
-| --- | --- |
-| KAGE token | `0x64b60e9575bC0b09F802e55a15B18a5C86aE5cf7` |
-| Registry | `0x397b3A679612F60Dc73D43a6f79b910DD60172a7` |
-| Vouch V2 | `0xDC139924D5f948871Ae9f8050c3b8FA43D493fA2` |
-| Market | `0x801FF0a5364E2c4E0cEF6202e6B0Da9698C09D8e` |
+After the broadcast confirms, you send three transactions from that wallet:
+
+1. `mint` on the KAGE token to your address for 10,000,000 KAGE.
+2. `mint` on the KAGE token to the rewards contract for 1,000,000 KAGE.
+3. `setPricingAllowed` on the market for the adaptive pricing contract.
+
+The gas key cannot do those. It has no role once the second script confirms.
 
 The clickable desk source is in [console/](console/).
 

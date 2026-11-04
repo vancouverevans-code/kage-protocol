@@ -50,25 +50,29 @@ contract DeployKage is Script {
 
   function run() external {
     uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
-    owner = vm.addr(pk);
+    address broadcaster = vm.addr(pk);
+    owner = vm.envAddress("OWNER");
+    if (owner == address(0)) revert("OWNER required");
     admin = vm.envOr("ADMIN", owner);
-    signer = vm.envAddress("EXPECTED_SIGNER");
+    if (admin == address(0)) admin = owner;
+    signer = vm.envOr("EXPECTED_SIGNER", owner);
+    if (signer == address(0)) signer = owner;
 
     vm.startBroadcast(pk);
-    _deployInfra();
+    _deployInfra(broadcaster);
     _deployToken();
     _deployV2();
     _wire();
-    token.mint(owner, GENESIS_MINT);
-    token.mint(address(rewards), REWARDS_SEED);
     vm.stopBroadcast();
-    _log();
+    _log(broadcaster);
   }
 
-  function _deployInfra() internal {
+  function _deployInfra(address broadcaster) internal {
     verifier = new SignatureVerifier();
     cam = new ContractAddressManager();
-    interactionControl = new InteractionControl(owner, address(cam));
+    // Broadcaster owns the registry and the pause switch only until the legacy
+    // script finishes registration, then both are transferred to OWNER.
+    interactionControl = new InteractionControl(broadcaster, address(cam));
     _register(ETHOS_INTERACTION_CONTROL, address(interactionControl));
   }
 
@@ -90,7 +94,7 @@ contract DeployKage is Script {
     market = EthosMarket(_proxy(address(new EthosMarket()), _marketInit(access)));
     rewards = EthosRewards(_proxy(address(new EthosRewards()), _rewardsInit(access)));
     pricing = new AdaptiveLMSRPricing(LMSR_B0, LMSR_ALPHA);
-    market.setPricingAllowed(address(pricing), true);
+    // setPricingAllowed is onlyOwner. OWNER calls it from their wallet after deploy.
   }
 
   function _vouchInit(AccessControlV2.AccessControlInitParams memory access) internal view returns (bytes memory) {
@@ -118,7 +122,8 @@ contract DeployKage is Script {
     interactionControl.addControlledContractNames(controlled);
   }
 
-  function _log() internal {
+  function _log(address broadcaster) internal {
+    console2.log("broadcaster", broadcaster);
     console2.log("owner", owner);
     console2.log("admin", admin);
     console2.log("expectedSigner", signer);
@@ -134,6 +139,7 @@ contract DeployKage is Script {
 
     string memory json = "v2";
     vm.serializeUint(json, "chainId", block.chainid);
+    vm.serializeAddress(json, "broadcaster", broadcaster);
     vm.serializeAddress(json, "owner", owner);
     vm.serializeAddress(json, "admin", admin);
     vm.serializeAddress(json, "expectedSigner", signer);
